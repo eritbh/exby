@@ -264,6 +264,33 @@ function globalExportsVariableName (chunkFileName) {
 		manifest.background.scripts = manifest.background.scripts.filter((val, i, arr) => arr.indexOf(val) === i);
 	}
 
+	// We also have to handle assets, though this isn't too bad. We don't do any transformations on the file data like
+	// we did for entry points, we just add them to our output files.
+	// TODO: This code is written such that the output path could be transformed to avoid conflicts with script names,
+	//       but we don't yet have a good way to perform this transformation where these paths are referenced from code.
+	//       If we put all assets in an "assets" directory in the build, we have to also update all code that has those
+	//       paths hardcoded to point to the subdirectory as well, and this is hard without creating a declarative
+	//       import handler for non-code assets. Webpack has this for inspiration, but it's gonna be a pain. For now, we
+	//       just assume that the user won't have conflicting paths or paths into the parent directory.
+	for (const [i, assetPath] of Object.entries(manifest.web_accessible_resources || [])) {
+		const outputFilename = assetPath; // this is where we'd transform the asset path
+		if (outputFiles[outputFilename] != null) {
+			continue;
+		}
+		console.log('asset', assetPath, '=>', outputFilename);
+		outputFiles[outputFilename] = await fs.readFile(path.resolve(manifestPath, '..', assetPath));
+		manifest.web_accessible_resources[i] = outputFilename;
+	}
+	for (const [key, assetPath] of Object.entries(manifest.icons || {})) {
+		const outputFilename = assetPath; // this is where we'd transform the asset path
+		if (outputFiles[outputFilename] != null) {
+			continue;
+		}
+		console.log('asset', assetPath, '=>', outputFilename);
+		outputFiles[outputFilename] = await fs.readFile(path.resolve(manifestPath, '..', assetPath));
+		manifest.icons[key] = outputFilename;
+	}
+
 	// Once we're done replacing paths, we add the revised manifest to our output.
 	outputFiles['manifest.json'] = Buffer.from(JSON.stringify(manifest), 'utf-8');
 
