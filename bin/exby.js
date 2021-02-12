@@ -38,22 +38,33 @@ function globalExportsVariableName (chunkFileName) {
 }
 
 (async () => {
-	const argv = yargs.command('$0 <input> <output>', false, command => command
+	const argv = yargs.command('$0 <input>', false, command => command
 		.positional('input', {
 			desc: 'Path to a manifest.json file, or to a directory containing a manifest.json file.',
 			string: true,
 		})
-		.positional('output', {
-			desc: 'Name of a directory that will contain the built extension. If this path exists, it will be cleaned before the output is written.',
+		.option('dir', {
+			desc: 'Outputs the built extension to the given directory path.',
 			string: true,
+		})
+		.option('zip', {
+			desc: 'Outputs the built extension to the given zip file.',
+			string: true,
+		})
+		.check(argv => {
+			if (!argv.dir && !argv.zip) {
+				throw new Error('At least one output option (dir or zip) must be specified');
+			}
+			return true;
 		})
 		.option('cjs-exclude', {
 			desc: 'Patterns to exclude from CommonJS module conversion, e.g. polyfills that need direct access to the global scope.',
 			array: true,
 			default: [],
 		})
-	)
-	.argv;
+	).argv;
+
+	console.log(argv);
 
 	// Make the manifest path into an absolute path
 	let manifestPath = path.resolve(process.cwd(), argv.input);
@@ -255,15 +266,29 @@ function globalExportsVariableName (chunkFileName) {
 	}
 
 	// Finally, it's time to write our output.
-	let outputPath = path.resolve(process.cwd(), argv.output);
-	if (await pathExists(outputPath)) {
-		await rimraf(outputPath);
+
+	// Writing to a directory
+	if (argv.dir) {
+		let outputDirPath = path.resolve(process.cwd(), argv.dir);
+		if (await pathExists(outputDirPath)) {
+			await rimraf(outputDirPath);
+		}
+
+		await fs.mkdir(outputDirPath);
+		await fs.writeFile(path.resolve(outputDirPath, 'manifest.json'), JSON.stringify(manifest), 'utf-8');
+		await Promise.all(Object.entries(outputFiles).map(async ([filename, code]) => {
+			await fs.writeFile(path.resolve(outputDirPath, filename), code, 'utf-8');
+		}));
 	}
 
-	await fs.mkdir(outputPath);
-	await fs.writeFile(path.resolve(outputPath, 'manifest.json'), JSON.stringify(manifest), 'utf-8');
-	await Promise.all(Object.entries(outputFiles).map(async ([filename, code]) => {
-		await fs.writeFile(path.resolve(outputPath, filename), code, 'utf-8');
-	}));
+	// Writing to a zip file
+	if (argv.zip) {
+		let outputZipPath = path.resolve(process.cwd(), argv.zip);
+		if (await pathExists(outputZipPath)) {
+			await rimraf(outputZipPath);
+		}
+
+		console.log('zips cannot be written yet :(');
+	}
 	console.log('done!')
 })();
