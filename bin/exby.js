@@ -277,7 +277,6 @@ function globalExportsVariableName (chunkFileName) {
 		if (outputFiles[outputFilename] != null) {
 			continue;
 		}
-		console.log('asset', assetPath, '=>', outputFilename);
 		outputFiles[outputFilename] = await fs.readFile(path.resolve(manifestPath, '..', assetPath));
 		manifest.web_accessible_resources[i] = outputFilename;
 	}
@@ -286,7 +285,6 @@ function globalExportsVariableName (chunkFileName) {
 		if (outputFiles[outputFilename] != null) {
 			continue;
 		}
-		console.log('asset', assetPath, '=>', outputFilename);
 		outputFiles[outputFilename] = await fs.readFile(path.resolve(manifestPath, '..', assetPath));
 		manifest.icons[key] = outputFilename;
 	}
@@ -326,5 +324,4 @@ function globalExportsVariableName (chunkFileName) {
 		}
 		await fs.writeFile(outputZipPath, await zip.generateAsync({type: 'nodebuffer'}));
 	}
-	console.log('done!')
 })();
