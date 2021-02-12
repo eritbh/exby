@@ -2,7 +2,9 @@
 
 const path = require('path');
 const fs = require('fs').promises;
+const util = require('util');
 const yargs = require('yargs');
+const rimraf = util.promisify(require('rimraf'));
 const rollup = require('rollup');
 const {nodeResolve} = require('@rollup/plugin-node-resolve');
 const commonjs = require('@rollup/plugin-commonjs');
@@ -42,7 +44,7 @@ function globalExportsVariableName (chunkFileName) {
 			string: true,
 		})
 		.positional('output', {
-			desc: 'Name of a directory that will contain the built extension.',
+			desc: 'Name of a directory that will contain the built extension. If this path exists, it will be cleaned before the output is written.',
 			string: true,
 		})
 		.option('cjs-exclude', {
@@ -60,13 +62,6 @@ function globalExportsVariableName (chunkFileName) {
 	const stats = await fs.stat(manifestPath);
 	if (stats.isDirectory()) {
 		manifestPath = path.resolve(manifestPath, 'manifest.json');
-	}
-
-	// We also check the output path ahead of time - if it needs to be cleaned, we won't bother building anything
-	let outputPath = path.resolve(process.cwd(), argv.output);
-	if (await pathExists(outputPath)) {
-		console.log('Output path should not exist - I will create it');
-		process.exit(1)
 	}
 
 	// Load the contents of the manifest
@@ -260,6 +255,11 @@ function globalExportsVariableName (chunkFileName) {
 	}
 
 	// Finally, it's time to write our output.
+	let outputPath = path.resolve(process.cwd(), argv.output);
+	if (await pathExists(outputPath)) {
+		await rimraf(outputPath);
+	}
+
 	await fs.mkdir(outputPath);
 	await fs.writeFile(path.resolve(outputPath, 'manifest.json'), JSON.stringify(manifest), 'utf-8');
 	await Promise.all(Object.entries(outputFiles).map(async ([filename, code]) => {
