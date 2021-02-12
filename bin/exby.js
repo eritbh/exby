@@ -8,6 +8,7 @@ const rimraf = util.promisify(require('rimraf'));
 const rollup = require('rollup');
 const {nodeResolve} = require('@rollup/plugin-node-resolve');
 const commonjs = require('@rollup/plugin-commonjs');
+const JSZip = require('jszip');
 
 /** Returns whether or not the given path exists. */
 function pathExists (path) {
@@ -288,7 +289,12 @@ function globalExportsVariableName (chunkFileName) {
 			await rimraf(outputZipPath);
 		}
 
-		console.log('zips cannot be written yet :(');
+		const zip = new JSZip();
+		zip.file('manifest.json', JSON.stringify(manifest))
+		for (const [filename, code] of Object.entries(outputFiles)) {
+			zip.file(filename, code);
+		}
+		await fs.writeFile(outputZipPath, await zip.generateAsync({type: 'nodebuffer'}));
 	}
 	console.log('done!')
 })();
