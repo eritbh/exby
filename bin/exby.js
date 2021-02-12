@@ -65,8 +65,6 @@ function globalExportsVariableName (chunkFileName) {
 		})
 	).argv;
 
-	console.log(argv);
-
 	// Make the manifest path into an absolute path
 	let manifestPath = path.resolve(process.cwd(), argv.input);
 
