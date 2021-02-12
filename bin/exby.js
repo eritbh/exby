@@ -135,7 +135,7 @@ function globalExportsVariableName (chunkFileName) {
 	// module that looks like this:
 	//
 	//     // src/foo.js
-	//     import {something} from 'somewhere.js';
+	//     import {something} from './somewhere.js';
 	//     export const somethingElse = something + 1;
 	//     export const somethingDifferentEntirely = 100;
 	//
@@ -175,7 +175,6 @@ function globalExportsVariableName (chunkFileName) {
 				},
 
 				// ...and when Rollup tries to load that "file," we tell it to use the source code we want to transform.
-				// The temporary ID is only used here
 				load (id) {
 					if (id === chunk.fileName) {
 						return chunk.code;
