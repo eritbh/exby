@@ -114,7 +114,7 @@ function globalExportsVariableName (chunkFileName) {
 				load (id) {
 					// Code references to the manifest are resolved at runtime
 					if (id === manifestPath) {
-						return 'export default (browser || chrome).runtime.getManifest();';
+						return 'export default (window.browser || window.chrome).runtime.getManifest();';
 					}
 					// Other modules are loaded normally
 					return null;
