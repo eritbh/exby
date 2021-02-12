@@ -2,7 +2,7 @@
 
 const path = require('path');
 const fs = require('fs').promises;
-const minimist = require("minimist");
+const yargs = require('yargs');
 const rollup = require('rollup');
 const {nodeResolve} = require('@rollup/plugin-node-resolve');
 const commonjs = require('@rollup/plugin-commonjs');
@@ -36,9 +36,7 @@ function globalExportsVariableName (chunkFileName) {
 }
 
 (async () => {
-	const argv = minimist(process.argv.slice(2), {
-		// TODO
-	})
+	const argv = yargs(process.argv.slice(2)).argv;
 
 	// Make the manifest path into an absolute path
 	let manifestPath = argv._[0];
