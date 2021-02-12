@@ -227,7 +227,7 @@ function globalExportsVariableName (chunkFileName) {
 		}
 
 		// Tricky part's out of the way now~! Save the final result for later.
-		outputFiles[chunk.fileName] = iifeOutput[0].code;
+		outputFiles[chunk.fileName] = Buffer.from(iifeOutput[0].code, 'utf-8');
 	}
 
 	// All we have to do now is map each of our initial entry point files to a list of output files. We do have to be
@@ -264,6 +264,9 @@ function globalExportsVariableName (chunkFileName) {
 		manifest.background.scripts = manifest.background.scripts.filter((val, i, arr) => arr.indexOf(val) === i);
 	}
 
+	// Once we're done replacing paths, we add the revised manifest to our output.
+	outputFiles['manifest.json'] = Buffer.from(JSON.stringify(manifest), 'utf-8');
+
 	// Finally, it's time to write our output.
 
 	// Writing to a directory
@@ -274,7 +277,6 @@ function globalExportsVariableName (chunkFileName) {
 		}
 
 		await fs.mkdir(outputDirPath);
-		await fs.writeFile(path.resolve(outputDirPath, 'manifest.json'), JSON.stringify(manifest), 'utf-8');
 		await Promise.all(Object.entries(outputFiles).map(async ([filename, code]) => {
 			await fs.writeFile(path.resolve(outputDirPath, filename), code, 'utf-8');
 		}));
