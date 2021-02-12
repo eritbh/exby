@@ -36,15 +36,25 @@ function globalExportsVariableName (chunkFileName) {
 }
 
 (async () => {
-	const argv = yargs(process.argv.slice(2)).argv;
+	const argv = yargs.command('$0 <input> <output>', false, command => command
+		.positional('input', {
+			desc: 'Path to a manifest.json file, or to a directory containing a manifest.json file.',
+			string: true,
+		})
+		.positional('output', {
+			desc: 'Name of a directory that will contain the built extension.',
+			string: true,
+		})
+		.option('cjs-exclude', {
+			desc: 'Patterns to exclude from CommonJS module conversion, e.g. polyfills that need direct access to the global scope.',
+			array: true,
+			default: [],
+		})
+	)
+	.argv;
 
 	// Make the manifest path into an absolute path
-	let manifestPath = argv._[0];
-	if (!manifestPath) {
-		console.log('Manifest path is required');
-		process.exit(1);
-	}
-	manifestPath = path.resolve(process.cwd(), manifestPath);
+	let manifestPath = path.resolve(process.cwd(), argv.input);
 
 	// If the given path is a directory, our entry point is the manifest.json inside
 	const stats = await fs.stat(manifestPath);
@@ -53,12 +63,7 @@ function globalExportsVariableName (chunkFileName) {
 	}
 
 	// We also check the output path ahead of time - if it needs to be cleaned, we won't bother building anything
-	let outputPath = argv._[1];
-	if (!outputPath) {
-		console.log('Output path is required');
-		process.exit(1);
-	}
-	outputPath = path.resolve(process.cwd(), outputPath);
+	let outputPath = path.resolve(process.cwd(), argv.output);
 	if (await pathExists(outputPath)) {
 		console.log('Output path should not exist - I will create it');
 		process.exit(1)
@@ -105,7 +110,9 @@ function globalExportsVariableName (chunkFileName) {
 		input: Object.values(entryPoints),
 		plugins: [
 			nodeResolve(),
-			commonjs(),
+			commonjs({
+				exclude: argv.cjsExclude,
+			}),
 			// During this stage, we also rewrite any references to the manifest file. The contents of the manifest can
 			// be read at runtime, so we do that rather than including another copy of it in the built code.
 			{
@@ -223,6 +230,7 @@ function globalExportsVariableName (chunkFileName) {
 	// already mapped paths in the manifest to chunk IDs earlier, so we can now go from manifest paths to a list of
 	// dependencies.
 	function flatImportList (chunk) {
+		if (!chunk) return [];
 		const nestedImports = chunk.imports.map(importee => flatImportList(codeSplitOutput.find(c => c.fileName === importee)));
 		return [].concat(...nestedImports, [chunk.fileName]);
 	}
