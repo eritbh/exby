@@ -278,7 +278,10 @@ function globalExportsVariableName (chunkFileName) {
 
 		await fs.mkdir(outputDirPath);
 		await Promise.all(Object.entries(outputFiles).map(async ([filename, code]) => {
-			await fs.writeFile(path.resolve(outputDirPath, filename), code, 'utf-8');
+			// File names in our outputFiles object may contain subdirectories, which we have to ensure exist
+			const filePath = path.resolve(outputDirPath, filename);
+			await fs.mkdir(path.dirname(filePath), {recursive: true});
+			await fs.writeFile(filePath, code);
 		}));
 	}
 
