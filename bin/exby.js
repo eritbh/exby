@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+'use strict';
+
 const path = require('path');
 const fs = require('fs').promises;
 const util = require('util');
@@ -11,15 +13,21 @@ const {nodeResolve} = require('@rollup/plugin-node-resolve');
 const commonjs = require('@rollup/plugin-commonjs');
 const JSZip = require('jszip');
 
-/** Returns whether or not the given path exists. */
-function pathExists (path) {
-	return fs.access(path).then(() => true).catch(() => false);
+/**
+ * Returns whether or not the given path exists.
+ * @param {string} somePath
+ * @returns {boolean}
+ */
+function pathExists (somePath) {
+	return fs.access(somePath).then(() => true).catch(() => false);
 }
 
-let varNameCache = new Map();
+const varNameCache = new Map();
 /**
  * Returns a unique string which is a valid Javascript identifier associated
  * with the given chunk.
+ * @param {string} chunkFileName
+ * @returns {string}
  */
 function globalExportsVariableName (chunkFileName) {
 	// Check cache first - if we've seen this module before, return what we already have
@@ -31,6 +39,7 @@ function globalExportsVariableName (chunkFileName) {
 	// Generate a new variable name from this module's path
 	let name = `__EXBY_MODULE__${makeLegalIdentifier(chunkFileName)}__`;
 	// If we somehow got a collision, add extra characters until we have something unique
+	// eslint-disable-next-line no-loop-func
 	while ([...varNameCache.values()].some(val => val === name)) {
 		name += '_';
 	}
@@ -53,8 +62,8 @@ function globalExportsVariableName (chunkFileName) {
 			desc: 'Outputs the built extension to the given zip file.',
 			string: true,
 		})
-		.check(argv => {
-			if (!argv.dir && !argv.zip) {
+		.check(options => {
+			if (!options.dir && !options.zip) {
 				throw new Error('At least one output option (`--dir` or `--zip`) must be specified.');
 			}
 			return true;
@@ -63,8 +72,7 @@ function globalExportsVariableName (chunkFileName) {
 			desc: 'Patterns to exclude from CommonJS module conversion, e.g. polyfills that need direct access to the global scope.',
 			array: true,
 			default: [],
-		})
-	).argv;
+		})).argv;
 
 	// Make the manifest path into an absolute path
 	let manifestPath = path.resolve(process.cwd(), argv.input);
@@ -88,9 +96,11 @@ function globalExportsVariableName (chunkFileName) {
 			}
 		}
 	}
-	if (manifest.background) for (const scriptPath of manifest.background.scripts || []) {
-		if (!entryPoints[scriptPath]) {
-			entryPoints[scriptPath] = path.resolve(manifestPath, '..', scriptPath);
+	if (manifest.background) {
+		for (const scriptPath of manifest.background.scripts || []) {
+			if (!entryPoints[scriptPath]) {
+				entryPoints[scriptPath] = path.resolve(manifestPath, '..', scriptPath);
+			}
 		}
 	}
 
@@ -129,8 +139,8 @@ function globalExportsVariableName (chunkFileName) {
 					}
 					// Other modules are loaded normally
 					return null;
-				},		
-			}
+				},
+			},
 		],
 	});
 	// The output we get here is an array of "chunks," each of which corresponds to a single output file (which may
@@ -171,7 +181,7 @@ function globalExportsVariableName (chunkFileName) {
 	for (const chunk of codeSplitOutput) {
 		if (chunk.type !== 'chunk') continue;
 
-		// Convert module imports from ES format to our IIFE-based system. 
+		// Convert module imports from ES format to our IIFE-based system.
 		const iifeBundle = await rollup.rollup({
 			plugins: [{
 				// We don't pass `input` to this rollup process, since it only accepts file paths and we're dealing with
@@ -210,7 +220,7 @@ function globalExportsVariableName (chunkFileName) {
 					// TODO
 					const result = id.replace(/^\.?\.\//, '');
 					return result;
-				},		
+				},
 			}],
 		});
 		const {output: iifeOutput} = await iifeBundle.generate({
@@ -242,10 +252,10 @@ function globalExportsVariableName (chunkFileName) {
 	}
 	const dependencyMap = {};
 	for (const [entryPath, entryModuleID] of Object.entries(entryPoints)) {
-		const entryChunk = codeSplitOutput.find(chunk => chunk.facadeModuleId === entryModuleID)
+		const entryChunk = codeSplitOutput.find(chunk => chunk.facadeModuleId === entryModuleID);
 		dependencyMap[entryPath] = flatImportList(entryChunk);
 	}
-	
+
 	// Now that we have our dependency map, we need to replace the original paths in the manifest. Since we're replacing
 	// each individual array value with multiple new values, we work backwards through each list of entry points. We
 	// also filter each list for uniqueness once we're done, to ensure that each module is only loaded once per context,
@@ -253,7 +263,7 @@ function globalExportsVariableName (chunkFileName) {
 	for (const contentScript of manifest.content_scripts || []) {
 		if (contentScript.js) {
 			for (let i = contentScript.js.length - 1; i >= 0; i -= 1) {
-				contentScript.js.splice(i, 1, ...dependencyMap[contentScript.js[i]])
+				contentScript.js.splice(i, 1, ...dependencyMap[contentScript.js[i]]);
 			}
 			contentScript.js = contentScript.js.filter((val, i, arr) => arr.indexOf(val) === i);
 		}
@@ -297,7 +307,7 @@ function globalExportsVariableName (chunkFileName) {
 
 	// Writing to a directory
 	if (argv.dir) {
-		let outputDirPath = path.resolve(process.cwd(), argv.dir);
+		const outputDirPath = path.resolve(process.cwd(), argv.dir);
 		if (await pathExists(outputDirPath)) {
 			await rimraf(outputDirPath);
 		}
@@ -313,13 +323,13 @@ function globalExportsVariableName (chunkFileName) {
 
 	// Writing to a zip file
 	if (argv.zip) {
-		let outputZipPath = path.resolve(process.cwd(), argv.zip);
+		const outputZipPath = path.resolve(process.cwd(), argv.zip);
 		if (await pathExists(outputZipPath)) {
 			await rimraf(outputZipPath);
 		}
 
 		const zip = new JSZip();
-		zip.file('manifest.json', JSON.stringify(manifest))
+		zip.file('manifest.json', JSON.stringify(manifest));
 		for (const [filename, code] of Object.entries(outputFiles)) {
 			zip.file(filename, code);
 		}
