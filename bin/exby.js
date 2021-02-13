@@ -6,6 +6,7 @@ const util = require('util');
 const yargs = require('yargs');
 const rimraf = util.promisify(require('rimraf'));
 const rollup = require('rollup');
+const {makeLegalIdentifier} = require('@rollup/pluginutils');
 const {nodeResolve} = require('@rollup/plugin-node-resolve');
 const commonjs = require('@rollup/plugin-commonjs');
 const JSZip = require('jszip');
@@ -28,7 +29,7 @@ function globalExportsVariableName (chunkFileName) {
 	}
 
 	// Generate a new variable name from this module's path
-	let name = `__EXBY_MODULE__${chunkFileName.replace(/[^a-z0-9_]/gi, '_')}__`;
+	let name = `__EXBY_MODULE__${makeLegalIdentifier(chunkFileName)}__`;
 	// If we somehow got a collision, add extra characters until we have something unique
 	while ([...varNameCache.values()].some(val => val === name)) {
 		name += '_';
@@ -54,7 +55,7 @@ function globalExportsVariableName (chunkFileName) {
 		})
 		.check(argv => {
 			if (!argv.dir && !argv.zip) {
-				throw new Error('At least one output option (dir or zip) must be specified');
+				throw new Error('At least one output option (`--dir` or `--zip`) must be specified.');
 			}
 			return true;
 		})
