@@ -224,7 +224,7 @@ function globalExportsVariableName (chunkFileName) {
 		// IIFE builds should never have more than one output - if there's more, there's probably an asset that got
 		// added to the build somehow. We don't know how to handle assets (yet).
 		if (iifeOutput.length !== 1) {
-			throw new Error(`IIFE build of ${chunkId} generated ${iifeOutput.length} outputs`);
+			throw new Error(`IIFE build of ${chunk.filename} generated ${iifeOutput.length} outputs`);
 		}
 
 		// Tricky part's out of the way now~! Save the final result for later.
