@@ -22,6 +22,11 @@ function pathExists (somePath) {
 	return fs.access(somePath).then(() => true).catch(() => false);
 }
 
+// Helper for iterating asynchronously
+function forEachParallel (items, func) {
+	return Promise.all(items.map((...args) => func(...args)));
+}
+
 const varNameCache = new Map();
 /**
  * Returns a unique string which is a valid Javascript identifier associated
@@ -178,8 +183,8 @@ function globalExportsVariableName (chunkFileName) {
 	// those values - this is handled below, when we rewrite the manifest. Once we've ensured these two things, we can
 	// rewrite imports as global variable reads.
 	const outputFiles = {};
-	for (const chunk of codeSplitOutput) {
-		if (chunk.type !== 'chunk') continue;
+	await forEachParallel(codeSplitOutput, async chunk => {
+		if (chunk.type !== 'chunk') return;
 
 		// Convert module imports from ES format to our IIFE-based system.
 		const iifeBundle = await rollup.rollup({
@@ -239,7 +244,7 @@ function globalExportsVariableName (chunkFileName) {
 
 		// Tricky part's out of the way now~! Save the final result for later.
 		outputFiles[chunk.fileName] = Buffer.from(iifeOutput[0].code, 'utf-8');
-	}
+	});
 
 	// All we have to do now is map each of our initial entry point files to a list of output files. We do have to be
 	// careful to list dependencies first, so their exported values are ready before other files try to use them. We
@@ -283,22 +288,22 @@ function globalExportsVariableName (chunkFileName) {
 	//       paths hardcoded to point to the subdirectory as well, and this is hard without creating a declarative
 	//       import handler for non-code assets. Webpack has this for inspiration, but it's gonna be a pain. For now, we
 	//       just assume that the user won't have conflicting paths or paths into the parent directory.
-	for (const [i, assetPath] of Object.entries(manifest.web_accessible_resources || [])) {
+	await forEachParallel(Object.entries(manifest.web_accessible_resources || []), async ([i, assetPath]) => {
 		const outputFilename = assetPath; // this is where we'd transform the asset path
 		if (outputFiles[outputFilename] != null) {
-			continue;
+			return;
 		}
 		outputFiles[outputFilename] = await fs.readFile(path.resolve(manifestPath, '..', assetPath));
 		manifest.web_accessible_resources[i] = outputFilename;
-	}
-	for (const [key, assetPath] of Object.entries(manifest.icons || {})) {
+	});
+	await forEachParallel(Object.entries(manifest.icons || {}), async ([key, assetPath]) => {
 		const outputFilename = assetPath; // this is where we'd transform the asset path
 		if (outputFiles[outputFilename] != null) {
-			continue;
+			return;
 		}
 		outputFiles[outputFilename] = await fs.readFile(path.resolve(manifestPath, '..', assetPath));
 		manifest.icons[key] = outputFilename;
-	}
+	});
 
 	// Once we're done replacing paths, we add the revised manifest to our output.
 	outputFiles['manifest.json'] = Buffer.from(JSON.stringify(manifest), 'utf-8');
@@ -313,12 +318,12 @@ function globalExportsVariableName (chunkFileName) {
 		}
 
 		await fs.mkdir(outputDirPath);
-		await Promise.all(Object.entries(outputFiles).map(async ([filename, code]) => {
+		await forEachParallel(Object.entries(outputFiles), async ([filename, code]) => {
 			// File names in our outputFiles object may contain subdirectories, which we have to ensure exist
 			const filePath = path.resolve(outputDirPath, filename);
 			await fs.mkdir(path.dirname(filePath), {recursive: true});
 			await fs.writeFile(filePath, code);
-		}));
+		});
 	}
 
 	// Writing to a zip file
