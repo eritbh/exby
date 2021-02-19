@@ -100,7 +100,6 @@ module.exports = declareBabelPlugin((babel, {
 						}));
 						iifeParamNames.push(t.identifier(meta.exportName));
 					}
-					console.log(meta.source);
 					for (const [sourcePath, {name}] of meta.source) {
 						iifeArgs.push(importArgumentTemplate({
 							// TODO: Support Node module resolution for import specifiers
