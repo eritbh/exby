@@ -114,7 +114,10 @@ const {pathExists, forEachParallel} = require('../src/util');
 	// contain multiple input files merged together). Note that chunks which contain our entry points have a property
 	// `facadeModuleId` which matches the absolute path of the entry point it contains. We still have to do some more
 	// transformation to this output, but afterwards, we'll use that property to map our chunks back to the manifest.
-	const {output: codeSplitOutput} = await codeSplitBundle.generate({format: 'es'});
+	const {output: codeSplitOutput} = await codeSplitBundle.generate({
+		format: 'es',
+		sourcemap: 'inline',
+	});
 	await codeSplitBundle.close();
 
 	// Once we've got our merged, code-split chunks, we need to convert them to a format our target environment can
@@ -151,6 +154,7 @@ const {pathExists, forEachParallel} = require('../src/util');
 		// Convert module imports from ES format to our IIFE-based system.
 		const {code} = await babel.transformAsync(chunk.code, {
 			filename: chunk.fileName,
+			inputSourceMap: chunk.map,
 			sourceMaps: 'inline',
 			plugins: [
 				[path.resolve(__dirname, '../src/babelPlugin.js'), {
