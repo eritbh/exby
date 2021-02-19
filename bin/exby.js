@@ -13,20 +13,7 @@ const commonjs = require('@rollup/plugin-commonjs');
 const babel = require('@babel/core');
 const JSZip = require('jszip');
 
-/**
- * Returns whether or not the given path exists.
- * @param {string} somePath
- * @returns {boolean}
- */
-function pathExists (somePath) {
-	return fs.access(somePath).then(() => true).catch(() => false);
-}
-
-// Helper for iterating asynchronously
-function forEachParallel (items, func) {
-	return Promise.all(items.map((...args) => func(...args)));
-}
-
+const {pathExists, forEachParallel} = require('../src/util');
 
 (async () => {
 	const argv = yargs.command('$0 <input>', false, command => command
