@@ -8,9 +8,9 @@ const util = require('util');
 const yargs = require('yargs');
 const rimraf = util.promisify(require('rimraf'));
 const rollup = require('rollup');
-const {makeLegalIdentifier} = require('@rollup/pluginutils');
 const {nodeResolve} = require('@rollup/plugin-node-resolve');
 const commonjs = require('@rollup/plugin-commonjs');
+const babel = require('@babel/core');
 const JSZip = require('jszip');
 
 /**
@@ -27,31 +27,6 @@ function forEachParallel (items, func) {
 	return Promise.all(items.map((...args) => func(...args)));
 }
 
-const varNameCache = new Map();
-/**
- * Returns a unique string which is a valid Javascript identifier associated
- * with the given chunk.
- * @param {string} chunkFileName
- * @returns {string}
- */
-function globalExportsVariableName (chunkFileName) {
-	// Check cache first - if we've seen this module before, return what we already have
-	const existing = varNameCache.get(chunkFileName);
-	if (existing != null) {
-		return existing;
-	}
-
-	// Generate a new variable name from this module's path
-	let name = `__EXBY_MODULE__${makeLegalIdentifier(chunkFileName)}__`;
-	// If we somehow got a collision, add extra characters until we have something unique
-	// eslint-disable-next-line no-loop-func
-	while ([...varNameCache.values()].some(val => val === name)) {
-		name += '_';
-	}
-	// Set the cache and return
-	varNameCache.set(chunkFileName, name);
-	return name;
-}
 
 (async () => {
 	const argv = yargs.command('$0 <input>', false, command => command
@@ -187,63 +162,18 @@ function globalExportsVariableName (chunkFileName) {
 		if (chunk.type !== 'chunk') return;
 
 		// Convert module imports from ES format to our IIFE-based system.
-		const iifeBundle = await rollup.rollup({
-			plugins: [{
-				// We don't pass `input` to this rollup process, since it only accepts file paths and we're dealing with
-				// code in memory. Instead, we emit our code as a "file," using the output filename Rollup generated for
-				// us as a temporary ID...
-				buildStart () {
-					this.emitFile({
-						type: 'chunk',
-						id: chunk.fileName,
-						name: chunk.name,
-					});
-				},
-
-				// ...and when Rollup tries to load that "file," we tell it to use the source code we want to transform.
-				load (id) {
-					if (id === chunk.fileName) {
-						return chunk.code;
-					}
-
-					// If the source has import statements, this load hook will get called multiple times, where 'id' is
-					// the location being imported from. When generating IIFE output, Rollup will just inline all
-					// imported code into a single output file. Here, we tell Rollup that instead of inlining the entire
-					// source of the imported module, we just want to read the module's value from its associated
-					// global variable.
-					const importedModule = codeSplitOutput.find(c => c.type === 'chunk' && c.fileName === id);
-					const exportsString = importedModule.exports.join(',');
-					return `
-						const {${exportsString}} = ${globalExportsVariableName(id)};
-						export {${exportsString}};
-					`;
-				},
-
-				// We also have to tell Rollup that it shouldn't try to resolve relative paths. We do this by removing
-				// the relative path indicator from any locations being imported.
-				resolveId (id) {
-					// TODO
-					const result = id.replace(/^\.?\.\//, '');
-					return result;
-				},
-			}],
+		const {code} = await babel.transformAsync(chunk.code, {
+			filename: chunk.fileName,
+			sourceMaps: 'inline',
+			plugins: [
+				[path.resolve(__dirname, '../src/babelPlugin.js'), {
+					identifierPrefix: '__exby__',
+				}],
+			],
 		});
-		const {output: iifeOutput} = await iifeBundle.generate({
-			// Here, we tell Rollup to handle exports by using the IIFE format, assigning module exports to a global
-			// variable with the corresponding name.
-			format: 'iife',
-			name: globalExportsVariableName(chunk.fileName),
-		});
-		await iifeBundle.close();
-
-		// IIFE builds should never have more than one output - if there's more, there's probably an asset that got
-		// added to the build somehow. We don't know how to handle assets (yet).
-		if (iifeOutput.length !== 1) {
-			throw new Error(`IIFE build of ${chunk.filename} generated ${iifeOutput.length} outputs`);
-		}
 
 		// Tricky part's out of the way now~! Save the final result for later.
-		outputFiles[chunk.fileName] = Buffer.from(iifeOutput[0].code, 'utf-8');
+		outputFiles[chunk.fileName] = Buffer.from(code, 'utf-8');
 	});
 
 	// All we have to do now is map each of our initial entry point files to a list of output files. We do have to be
